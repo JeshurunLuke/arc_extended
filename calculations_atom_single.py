@@ -1485,6 +1485,7 @@ class StarkMap:
                     self.ax.set_title("Click on state to see state composition")
                     self.clickedPoint = 0
                     self.fig.canvas.draw()
+                    print("Trigger")
                     self.fig.canvas.mpl_connect("pick_event", self._onPick)
             plt.show()
         else:
@@ -1503,6 +1504,7 @@ class StarkMap:
             else: 
                 fieldOI = self.bFieldList 
             i = np.searchsorted(fieldOI, x)
+            print(fieldOI[i] *self.xScale)
             if i == len(fieldOI):
                 i -= 1
             if (i > 0) and (
