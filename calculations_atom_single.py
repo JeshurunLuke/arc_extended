@@ -696,7 +696,6 @@ class StarkMap:
         nMin,
         nMax,
         maxL,
-        Bz=0,
         progressOutput=False,
         debugOutput=False,
         s=0.5, compressedBasis = False, theta = 0, phi = 0 
@@ -755,7 +754,6 @@ class StarkMap:
         self.nMin = nMin
         self.nMax = nMax
         self.maxL = maxL
-        self.Bz = Bz
         self.s = s
         # save calculation details END
         if compressedBasis: 
@@ -837,7 +835,7 @@ class StarkMap:
                     states[ii][1],
                     states[ii][2],
                     states[ii][3],
-                    self.Bz,
+                    1,
                     s=self.s,
                 )
                 / C_h
