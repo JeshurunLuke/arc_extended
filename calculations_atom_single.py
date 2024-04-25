@@ -844,21 +844,23 @@ class StarkMap:
             # add off-diagonal element
 
             for jj in xrange(ii + 1, dimension):
-                coupling_z = (
-                    self._eFieldCouplingDivE(
-                        states[ii][0],
-                        states[ii][1],
-                        states[ii][2],
-                        mj,
-                        states[jj][0],
-                        states[jj][1],
-                        states[jj][2],
-                        mj,
-                        s=self.s,
-                    )
-                    * 1.0e-9
-                    / C_h
-                )
+                
+                #coupling_z = (
+                #    self._eFieldCouplingDivE(
+                #        states[ii][0],
+                #        states[ii][1],
+                #        states[ii][2],
+                #        mj,
+                #        states[jj][0],
+                #        states[jj][1],
+                #        states[jj][2],
+                #        mj,
+                #        s=self.s,
+                #    )
+                #    * 1.0e-9
+                #    / C_h
+                #)
+                coupling_z  = self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],0,s=self.s)*1.e-9/C_h*C_e*physical_constants["Bohr radius"][0]/sqrt(2)
                 coupling_x = (self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],-1,s=self.s)-self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],1,s=self.s))*\
                 1.e-9/C_h*C_e*physical_constants["Bohr radius"][0]/sqrt(2)
                 
@@ -1269,7 +1271,7 @@ class StarkMap:
             existingPlot = True
 
         fieldList = []
-        varScale = 1/100 if self.varOI else 1000
+        varScale = 1/100 if self.varOI else 1e4
         self.xScale = varScale
         y = []
         yState = []
@@ -1343,7 +1345,7 @@ class StarkMap:
 
         self.ax.set_ylim(lowerY, upperY)
         ##
-        self.ax.set_xlim(min(fieldList) / 100.0, max(fieldList) / 100.0)
+        self.ax.set_xlim(min(fieldList) * self.xScale, max(fieldList) *self.xScale)
         return 0
     def displayLevels(self, units='cm', progressOutput=False, debugOutput=False, displayAll=False):
         r"""
@@ -1504,7 +1506,6 @@ class StarkMap:
             else: 
                 fieldOI = self.bFieldList 
             i = np.searchsorted(fieldOI, x)
-            print(fieldOI[i] *self.xScale)
             if i == len(fieldOI):
                 i -= 1
             if (i > 0) and (
