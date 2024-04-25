@@ -584,6 +584,10 @@ class StarkMap:
             `fullStarkMatrix` = :obj:`mat1` + :obj:`mat2` *`eField`. Calculated by
             :obj:`defineBasis` in the basis :obj:`basisStates`.
         """
+        self.mat3 = []
+        """
+            elements of Zeeman-matrix in T
+        """
         self.indexOfCoupledState = []
         """
             Index of coupled state (initial state passed to :obj:`defineBasis`)
@@ -801,6 +805,7 @@ class StarkMap:
 
         self.mat1 = np.zeros((dimension, dimension), dtype=np.double)
         self.mat2 = np.zeros((dimension, dimension), dtype=np.double)
+        self.mat3 = np.zeros((dimension, dimension), dtype=np.double)
 
         self.basisStates = states
         self.indexOfCoupledState = indexOfCoupledState
@@ -825,7 +830,10 @@ class StarkMap:
                 * C_e
                 / C_h
                 * 1e-9
-                + self.atom.getZeemanEnergyShift(
+
+            )
+            self.mat3[ii][ii] = (
+                self.atom.getZeemanEnergyShift(
                     states[ii][1],
                     states[ii][2],
                     states[ii][3],
@@ -863,7 +871,7 @@ class StarkMap:
         if progressOutput:
             print("\n")
         if debugOutput:
-            print(self.mat1 + self.mat2)
+            print(self.mat1 + self.mat2 + self.mat3)
             print(self.mat2[0])
 
         self.atom.updateDipoleMatrixElementsFile()
@@ -873,7 +881,8 @@ class StarkMap:
 
     def diagonalise(
         self,
-        eFieldList,
+        Earray = [],
+        Barray = [], 
         drivingFromState=[0, 0, 0, 0, 0],
         progressOutput=False,
         debugOutput=False,
@@ -992,7 +1001,10 @@ class StarkMap:
         # ========= FIND LASER COUPLINGS (END) =======
 
         indexOfCoupledState = self.indexOfCoupledState
-        self.eFieldList = eFieldList
+        self.eFieldList = Earray
+        self.bFieldList = Barray
+        self.varOI = 1 if len(Barray) == 1 else 0
+        
 
         self.y = []
         self.highlight = []
@@ -1001,16 +1013,17 @@ class StarkMap:
         if progressOutput:
             print("Finding eigenvectors...")
         progress = 0.0
-        for eField in eFieldList:
+        for field in [Barray, Earray][self.varOI]:
             if progressOutput:
                 progress += 1.0
                 sys.stdout.write(
-                    "\r%d%%" % (float(progress) / float(len(eFieldList)) * 100)
+                    "\r%d%%" % (float(progress) / float(len(self.scanVar)) * 100)
                 )
                 sys.stdout.flush()
-
-            m = self.mat1 + self.mat2 * eField
-
+            if self.varOI: 
+                m = self.mat1 + self.mat2*field  + self.mat3 * Barray[0]
+            else: 
+                m = self.mat1 + self.mat2*Earray[0]  + self.mat3 * field
             ev, egvector = eigh(m)
 
             self.y.append(ev)
@@ -1125,16 +1138,24 @@ class StarkMap:
             )
 
             filename = fileBase + "_eField." + exportFormat
+            fieldOI = []
+            fname = ""
+            if self.varOI: 
+                fieldOI = self.eFieldList
+                fname = "E-Field (V/m)"
+            else: 
+                fieldOI = self.bFieldList
+                fname = "B-Field (T)"
             np.savetxt(
                 filename,
-                self.eFieldList,
+                fieldOI,
                 fmt="%.18e",
                 delimiter=", ",
                 newline="\n",
-                header=(commonHeader + " - - - eField (V/m) - - -"),
+                header=(commonHeader + f" - - - {fname} - - -"),
                 comments="# ",
             )
-            print("   Electric field values (V/m) saved in %s" % filename)
+            print(f"  {fname} saved in {filename}" )
 
             filename = fileBase + "_energyLevels." + exportFormat
             headerDetails = " NOTE : Each row corresponds to eigenstates for a single specified electric field"
@@ -1249,13 +1270,18 @@ class StarkMap:
         else:
             existingPlot = True
 
-        eFieldList = []
+        fieldList = []
+        varScale = 1/100 if self.varOI else 1000
+        self.xScale = varScale
         y = []
         yState = []
 
         for br in xrange(len(self.y)):
             for i in xrange(len(self.y[br])):
-                eFieldList.append(self.eFieldList[br])
+                if self.varOI:
+                    fieldList.append(self.eFieldList[br])
+                else:
+                    fieldList.append(self.bFieldList[br])
                 y.append(self.y[br][i])
                 if displayAll: 
                     yState.append(1.0)
@@ -1264,16 +1290,16 @@ class StarkMap:
 
         yState = np.array(yState)
         sortOrder = yState.argsort(kind="heapsort")
-        eFieldList = np.array(eFieldList)
+        fieldList = np.array(fieldList)
         y = np.array(y)
 
-        eFieldList = eFieldList[sortOrder]
+        fieldList = fieldList[sortOrder]
         y = y[sortOrder]
         yState = yState[sortOrder]
 
         if not highlightState:
             self.ax.scatter(
-                eFieldList / 100.0,
+                fieldList *varScale,
                 y * self.scaleFactor,
                 s=1,
                 color="k",
@@ -1283,7 +1309,7 @@ class StarkMap:
             cm = rvb
             cNorm = matplotlib.colors.Normalize(vmin=0.0, vmax=1.0)
             self.ax.scatter(
-                eFieldList / 100,
+                fieldList *varScale,
                 y * self.scaleFactor,
                 c=yState,
                 s=5,
@@ -1302,9 +1328,10 @@ class StarkMap:
                     )
                 else:
                     cb.set_label(r"$( \Omega_\mu | \Omega )^2$")
-
-        self.ax.set_xlabel("Electric field (V/cm)")
-
+        if self.varOI:
+            self.ax.set_xlabel("Electric field (V/cm)")
+        else: 
+            self.ax.set_xlabel("B field (G)")
         eV2GHz = C_e / C_h * 1e-9
         halfY = ylim
         # GHz, half Y range
@@ -1318,7 +1345,7 @@ class StarkMap:
 
         self.ax.set_ylim(lowerY, upperY)
         ##
-        self.ax.set_xlim(min(eFieldList) / 100.0, max(eFieldList) / 100.0)
+        self.ax.set_xlim(min(fieldList) / 100.0, max(fieldList) / 100.0)
         return 0
     def displayLevels(self, units='cm', progressOutput=False, debugOutput=False, displayAll=False):
         r"""
@@ -1366,7 +1393,7 @@ class StarkMap:
         import warnings
         warnings.filterwarnings('ignore')
         
-        Bz = self.Bz
+        bFieldList = self.bFieldList
         eFieldList = self.eFieldList
         theta = self.theta
         
@@ -1401,10 +1428,12 @@ class StarkMap:
             y = y[filterYstate]
             yState = yState[filterYstate]
             yComp = yComp[filterYstate]
-            
-            print(("[%s] = " % self.atom.elementName) +
-                    ("\n Bz = %.2f G, E = %.4f V/cm, angle = %.4f " %(Bz*1e4, eFieldList[br]/100, theta/pi*180)))
-             
+            if self.varOI:
+                print(("[%s] = " % self.atom.elementName) +
+                        ("\n Bz = %.2f G, E = %.4f V/cm, angle = %.4f " %(bFieldList[0]*1e4, eFieldList[br]/100, theta/pi*180)))
+            else: 
+                print(("[%s] = " % self.atom.elementName) +
+                    ("\n Bz = %.2f G, E = %.4f V/cm, angle = %.4f " %(bFieldList[br]*1e4, eFieldList[0]/100, theta/pi*180)))          
            
             sortOrder = yState.argsort(kind='heapsort')[::-1]
             yState = yState[sortOrder]         
@@ -1468,14 +1497,18 @@ class StarkMap:
         if isinstance(event.artist, matplotlib.collections.PathCollection):
             scaleFactor = self.scaleFactor
 
-            x = event.mouseevent.xdata * 100.0
+            x = event.mouseevent.xdata *1/self.xScale
             y = event.mouseevent.ydata / scaleFactor
-
-            i = np.searchsorted(self.eFieldList, x)
-            if i == len(self.eFieldList):
+            fieldOI = []
+            if self.varOI: 
+                fieldOI = self.eFieldList
+            else: 
+                fieldOI = self.bFieldList 
+            i = np.searchsorted(fieldOI, x)
+            if i == len(fieldOI):
                 i -= 1
             if (i > 0) and (
-                abs(self.eFieldList[i - 1] - x) < abs(self.eFieldList[i] - x)
+                abs(fieldOI[i - 1] - x) < abs(fieldOI[i] - x)
             ):
                 i -= 1
 
@@ -1496,7 +1529,7 @@ class StarkMap:
                 self.clickedPoint.remove()
 
             (self.clickedPoint,) = self.ax.plot(
-                [self.eFieldList[i] / 100.0],
+                [fieldOI[i] *self.xScale],
                 [self.y[i][j] * scaleFactor],
                 "bs",
                 linewidth=0,
