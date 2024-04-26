@@ -562,7 +562,7 @@ class StarkMap:
     .. _`Stark map example snippet`:
         ./Rydberg_atoms_a_primer_notebook.html#Rydberg-Atom-Stark-Shifts
     """
-
+    _dipole_cache = {}
     def __init__(self, atom):
         self.atom = atom
 
@@ -687,6 +687,36 @@ class StarkMap:
                 indexOfCoupledState = index
             index += 1
         self.indexOfCoupledState = indexOfCoupledState
+    def defineDipoleMatrix(self, nMin, nMax, maxL, s, compressedBasis):
+        cache_key = (self.__class__, nMin, nMax, maxL, s, compressedBasis, self.atom.elementName)
+        if cache_key not in StarkMap._dipole_cache:
+            print("First Initialization")
+            StarkMap._dipole_cache[cache_key] = self._dipoleMatrix(self.basisStates)
+        return StarkMap._dipole_cache[cache_key]
+
+    def _dipoleMatrix(self, states): 
+        
+        dimension = len(states)
+        
+        dipx = np.zeros((dimension, dimension), dtype = np.complex128)
+        dipy = np.zeros((dimension, dimension), dtype = np.complex128)
+        dipz = np.zeros((dimension, dimension), dtype = np.complex128)
+        
+        
+        for ii in xrange(dimension):
+            for jj in xrange(ii + 1, dimension):
+
+                dipz[jj][ii]  = self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],0,s=self.s)*1.e-9/C_h*C_e*physical_constants["Bohr radius"][0]/sqrt(2)
+                dipx[jj][ii] = (self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],-1,s=self.s)-self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],1,s=self.s))*\
+                1.e-9/C_h*C_e*physical_constants["Bohr radius"][0]/sqrt(2)
+                dipy[jj][ii]   = 1j*(self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],1,s=self.s)+self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],-1,s=self.s))*\
+                1.e-9/C_h*C_e*physical_constants["Bohr radius"][0]/sqrt(2)
+            
+        dipz = dipz + dipz.T.conj()  
+        dipy = dipy + dipy.T.conj()  
+        dipx = dipx + dipx.T.conj()  
+        
+        return dipx, dipy, dipz
     def defineBasis(
         self,
         n,
@@ -698,7 +728,7 @@ class StarkMap:
         maxL,
         progressOutput=False,
         debugOutput=False,
-        s=0.5, compressedBasis = False, theta = 0, phi = 0 
+        s=0.5, compressedBasis = False
     ):
         """
         Initializes basis of states around state of interest
@@ -743,7 +773,6 @@ class StarkMap:
         global wignerPrecal
         wignerPrecal = True
         self.eFieldCouplingSaved = _EFieldCoupling()
-        self.theta = theta
         states = []
 
         # save calculation details START
@@ -755,6 +784,7 @@ class StarkMap:
         self.nMax = nMax
         self.maxL = maxL
         self.s = s
+        
         # save calculation details END
         if compressedBasis: 
             for tn in xrange(nMin, nMax):
@@ -777,7 +807,7 @@ class StarkMap:
                                 states.append([tn, tl, tj, tmj])
 
                             
-
+        
         dimension = len(states)
         if progressOutput:
             print("Found ", dimension, " states.")
@@ -802,7 +832,7 @@ class StarkMap:
             print(states[indexOfCoupledState])
 
         self.mat1 = np.zeros((dimension, dimension), dtype=np.double)
-        self.mat2 = np.zeros((dimension, dimension), dtype=np.double)
+        self.mat2 = np.zeros((dimension, dimension), dtype=np.complex128)
         self.mat3 = np.zeros((dimension, dimension), dtype=np.double)
 
         self.basisStates = states
@@ -811,7 +841,7 @@ class StarkMap:
         if progressOutput:
             print("Generating matrix...")
         progress = 0.0
-
+        self.dip_x, self.dip_y, self.dip_z = self.defineDipoleMatrix(nMin, nMax, maxL, s, compressedBasis)
         for ii in xrange(dimension):
             if progressOutput:
                 progress += (dimension - ii) * 2 - 1
@@ -843,30 +873,7 @@ class StarkMap:
             )
             # add off-diagonal element
 
-            for jj in xrange(ii + 1, dimension):
-                
-                #coupling_z = (
-                #    self._eFieldCouplingDivE(
-                #        states[ii][0],
-                #        states[ii][1],
-                #        states[ii][2],
-                #        mj,
-                #        states[jj][0],
-                #        states[jj][1],
-                #        states[jj][2],
-                #        mj,
-                #        s=self.s,
-                #    )
-                #    * 1.0e-9
-                #    / C_h
-                #)
-                coupling_z  = self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],0,s=self.s)*1.e-9/C_h*C_e*physical_constants["Bohr radius"][0]/sqrt(2)
-                coupling_x = (self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],-1,s=self.s)-self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],1,s=self.s))*\
-                1.e-9/C_h*C_e*physical_constants["Bohr radius"][0]/sqrt(2)
-                
-                
-                self.mat2[jj][ii] = coupling_x*np.sin(theta) + coupling_z*np.cos(theta)
-                self.mat2[ii][jj] = np.conj(self.mat2[jj][ii])
+
 
         if progressOutput:
             print("\n")
@@ -884,6 +891,8 @@ class StarkMap:
         Earray = [],
         Barray = [], 
         drivingFromState=[0, 0, 0, 0, 0],
+        theta = 0, 
+        phi = 0, 
         progressOutput=False,
         debugOutput=False,
         upTo=4,
@@ -1003,6 +1012,8 @@ class StarkMap:
         indexOfCoupledState = self.indexOfCoupledState
         self.eFieldList = Earray
         self.bFieldList = Barray
+        self.theta = theta
+        self.phi = phi
         self.varOI = 1 if len(Barray) == 1 else 0
         
 
@@ -1013,6 +1024,9 @@ class StarkMap:
         if progressOutput:
             print("Finding eigenvectors...")
         progress = 0.0
+        
+        self.mat2 = self.dip_x*np.sin(theta)*np.cos(phi) + self.dip_y*np.sin(theta)*np.sin(phi) +  self.dip_z*np.cos(theta)
+        
         for field in [Barray, Earray][self.varOI]:
             if progressOutput:
                 progress += 1.0
