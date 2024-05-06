@@ -33,7 +33,8 @@ from scipy.constants import e as C_e
 from scipy.constants import m_e as C_m_e
 from scipy.optimize import curve_fit
 from scipy import interpolate
-
+import pickle
+import os
 # for matrices
 from numpy.linalg import eigh
 
@@ -487,7 +488,58 @@ class Wavefunction:
 
         return fig
 
+class RET: 
+    def __init__(self, StarkScan, resonanceCondition): 
+        self.stateOI = []
+        self.TransitionFrequency = resonanceCondition
+        self.StarkScan = StarkScan
+    def find_resonance(self,n,l): 
+        basisStates = self.StarkScan.basisStates
+        statesOI = []
+        index = 0 
+        for st in basisStates:
+            if (
+                (st[0] == n)
+                and (abs(st[1] - l) < 0.1)
+            ):
+                statesOI.append(index)
+            index += 1
+        
+        eigVecs = self.StarkScan.y_ev
+        eg = self.StarkScan.y
+        sols = {}
+        for state in statesOI: 
+            stateInit = np.zeros(len(basisStates))
+            stateInit[state] = 1.0
+            resonanceDiff = np.zeros((3, len(self.StarkScan.y)))
+            comp = []
+            indOI = np.argmax(np.abs(np.array(eigVecs[0]).conj().T @ stateInit))
+            for scan_param in range(len(self.StarkScan.y)):
+                
+                
+                eDiff =  eg[scan_param][indOI] - np.array(eg[scan_param]) 
+    
+                resonanceDiff[0, scan_param] = eg[scan_param][indOI]
+                
+                diff = eDiff - self.TransitionFrequency
+                dipoleCoupling = np.sum([np.abs(stateInit.conj().T @ dip @ eigVecs[scan_param]) for dip in [self.StarkScan.dip_x,self.StarkScan.dip_y, self.StarkScan.dip_z]], 0)
+                #dipoleCoupling = np.sum([(stateInit.conj().T @ dip @ eigVecs[scan_param]) for ip in [self.StarkScan.dip_x,self.StarkScan.dip_y, self.StarkScan.dip_z]], 0)
+                                
+                resonanceDiff[1, scan_param] = diff[np.argmin(np.abs(diff))]
+                resonanceDiff[2, scan_param] = np.sum(np.abs(dipoleCoupling/diff))
+                comp.append(
+                    self.StarkScan._stateComposition(self.StarkScan._stateComposition2(
+                        eigVecs[scan_param][:, indOI],
+                        upTo=3,
+                        totalContributionMax=0.98,
+                    ))
+                )
+            
+            sols[state] = [comp, resonanceDiff]
+        return sols
 
+            
+        
 class StarkMap:
     """
     Calculates Stark maps for single atom in a field
@@ -649,6 +701,17 @@ class StarkMap:
         #: to be specified when calling `defineBasis` as `s=0` or `s=1` for
         #: singlet and triplet states respectively
         self.s = 0.5
+    def save_cache(self, filename="cache.pkl"):
+        with open(filename, 'wb') as f:
+            pickle.dump(StarkMap._dipole_cache, f)
+    def load_cache(self, filename='cache.pkl'):
+        if os.path.exists(filename):
+            with open(filename, 'rb') as f:
+                return pickle.load(f)
+        else:
+            return {}  # Return an empty cache if the file doesn't exist
+    def set_cache(self, filename='cache.pkl'):
+        StarkMap._dipole_cache = self.load_cache()  # Load cache when instance is created
 
     def _eFieldCouplingDivE(self, n1, l1, j1, mj1, n2, l2, j2, mj2, s=0.5):
         # eFied coupling devided with E (witout actuall multiplication to getE)
@@ -693,7 +756,15 @@ class StarkMap:
             print("First Initialization")
             StarkMap._dipole_cache[cache_key] = self._dipoleMatrix(self.basisStates)
         return StarkMap._dipole_cache[cache_key]
-
+    def _dipoleComponent(self, states, comp): 
+                
+        dimension = len(states)
+        
+        dipC = np.zeros((dimension, dimension), dtype = np.complex128)
+        for ii in xrange(dimension):
+            for jj in xrange(ii + 1, dimension): 
+                dipC[jj][ii] = self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],comp,s=self.s)*1.e-9/C_h*C_e*physical_constants["Bohr radius"][0]/sqrt(2)
+        
     def _dipoleMatrix(self, states): 
         
         dimension = len(states)
@@ -1008,26 +1079,41 @@ class StarkMap:
                 )
 
         # ========= FIND LASER COUPLINGS (END) =======
+        if isinstance(theta, (int,  float, complex)): 
+            theta = [theta] 
+        if isinstance(phi, (int,  float, complex)): 
+            phi = [phi]
+        
+        if len(theta) != max(len(Earray), len(Barray)) and len(theta) != 1: 
+            raise "Incorrect length for theta array"
+        if len(phi) != max(len(Earray), len(Barray)) and len(phi) != 1: 
+            raise "Incorrect length for phi array"
+        if len(Earray) > 1 and len(Barray) > 1: 
+            raise "Can only scan E-Field or B-Field not both"
+
 
         indexOfCoupledState = self.indexOfCoupledState
         self.eFieldList = Earray
         self.bFieldList = Barray
-        self.theta = theta
-        self.phi = phi
+        self.theta = theta*np.ones(max(len(Earray), len(Barray)))
+        self.phi = phi*np.ones(max(len(Earray), len(Barray)))
+
+        
         self.varOI = 1 if len(Barray) == 1 else 0
         
 
         self.y = []
+        self.y_ev = []
         self.highlight = []
         self.composition = []
 
         if progressOutput:
             print("Finding eigenvectors...")
         progress = 0.0
+
+        self.mat2 = [self.dip_x*np.sin(self.theta[i])*np.cos(self.phi[i]) + self.dip_y*np.sin(self.theta[i])*np.sin(self.phi[i]) +  self.dip_z*np.cos(self.theta[i]) for i in range(len(self.theta))]
         
-        self.mat2 = self.dip_x*np.sin(theta)*np.cos(phi) + self.dip_y*np.sin(theta)*np.sin(phi) +  self.dip_z*np.cos(theta)
-        
-        for field in [Barray, Earray][self.varOI]:
+        for  ind_c, field in enumerate([Barray, Earray][self.varOI]):
             if progressOutput:
                 progress += 1.0
                 sys.stdout.write(
@@ -1035,12 +1121,13 @@ class StarkMap:
                 )
                 sys.stdout.flush()
             if self.varOI: 
-                m = self.mat1 + self.mat2*field  + self.mat3 * Barray[0]
+                m = self.mat1 + self.mat2[ind_c]*field  + self.mat3 * Barray[0]
             else: 
-                m = self.mat1 + self.mat2*Earray[0]  + self.mat3 * field
+                m = self.mat1 + self.mat2[ind_c]*Earray[0]  + self.mat3 * field
             ev, egvector = eigh(m)
 
             self.y.append(ev)
+            self.y_ev.append(egvector)
             if drivingFromState[0] < 0.1:
                 sh = []
                 comp = []

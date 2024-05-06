@@ -31,6 +31,7 @@ __all__ = [
     "Ylm",
     "Wavefunction",
     "StarkMap",
+    "RET", 
     "LevelPlot",
     "AtomSurfaceVdW",
     "OpticalLattice1D",
@@ -88,6 +89,7 @@ from arc.calculations_atom_single import (
     StarkBasisGenerator,
     ShirleyMethod,
     RWAStarkShift,
+    RET,
 )
 from arc.calculations_atom_pairstate import (
     PairStateInteractions,
