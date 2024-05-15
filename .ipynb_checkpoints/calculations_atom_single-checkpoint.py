@@ -821,7 +821,7 @@ class StarkMap:
         for ii in xrange(dimension):
             for jj in xrange(ii + 1, dimension):
 
-                dipz[jj][ii]  = self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],0,s=self.s)*1.e-9/C_h*C_e*physical_constants["Bohr radius"][0]
+                dipz[jj][ii]  = self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],0,s=self.s)*1.e-9/C_h*C_e*physical_constants["Bohr radius"][0]/sqrt(2)
                 dipx[jj][ii] = (self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],-1,s=self.s)-self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],1,s=self.s))*\
                 1.e-9/C_h*C_e*physical_constants["Bohr radius"][0]/sqrt(2)
                 dipy[jj][ii]   = 1j*(self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],1,s=self.s)+self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],-1,s=self.s))*\
@@ -1159,7 +1159,7 @@ class StarkMap:
         if progressOutput:
             print("Finding eigenvectors...")
         progress = 0.0
-        
+
         self.mat2 = [self.dip_x*np.sin(self.theta[i])*np.cos(self.phi[i]) + self.dip_y*np.sin(self.theta[i])*np.sin(self.phi[i]) +  self.dip_z*np.cos(self.theta[i]) for i in range(len(self.theta))]
         
         for  ind_c, field in enumerate([Barray, Earray][self.varOI]):
@@ -1172,7 +1172,7 @@ class StarkMap:
             if self.varOI: 
                 m = self.mat1 + self.mat2[ind_c]*field  + self.mat3 * Barray[0]
             else: 
-                m = self.mat2[ind_c]*Earray[0]  + self.mat3 * field+ self.mat1 
+                m = self.mat1 + self.mat2[ind_c]*Earray[0]  + self.mat3 * field
             ev, egvector = eigh(m)
 
             self.y.append(ev)
@@ -1353,8 +1353,7 @@ class StarkMap:
         debugOutput=False,
         highlightColour="red",
         addToExistingPlot=False, ylim = 1, 
-        displayAll=False,
-        x_vals=None, 
+        displayAll=False
     ):
         r"""
         Makes a plot of a stark map of energy levels
@@ -1422,29 +1421,17 @@ class StarkMap:
             existingPlot = True
 
         fieldList = []
-        varScale = None 
-        
+        varScale = 1/100 if self.varOI else 1e4
+        self.xScale = varScale
         y = []
         yState = []
-        self.xarray = None
-        import pandas as pd
-        if not(isinstance(x_vals,(list,pd.core.series.Series,np.ndarray))):
-            if self.varOI:
-                self.xarray = self.eFieldList
-                varScale = 1/100
-            else: 
-                self.xarray = self.bFieldList
-                varScale = 1e4
-        else:
-            self.xarray = x_vals
-            varScale = 1
-            
-        self.xScale = varScale
-            
+
         for br in xrange(len(self.y)):
             for i in xrange(len(self.y[br])):
-         
-                fieldList.append(self.xarray[br])
+                if self.varOI:
+                    fieldList.append(self.eFieldList[br])
+                else:
+                    fieldList.append(self.bFieldList[br])
                 y.append(self.y[br][i])
                 if displayAll: 
                     yState.append(1.0)
@@ -1663,7 +1650,11 @@ class StarkMap:
 
             x = event.mouseevent.xdata *1/self.xScale
             y = event.mouseevent.ydata / scaleFactor
-            fieldOI = self.xarray
+            fieldOI = []
+            if self.varOI: 
+                fieldOI = self.eFieldList
+            else: 
+                fieldOI = self.bFieldList 
             i = np.searchsorted(fieldOI, x)
             if i == len(fieldOI):
                 i -= 1
