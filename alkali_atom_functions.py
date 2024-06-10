@@ -743,7 +743,7 @@ class AlkaliAtom(object):
             / C_h
         )
 
-    def getEnergy(self, n, l, j, s=0.5):
+    def getEnergy(self, n, l, j, s=0.5, quantumDefect = None):
         """
         Energy of the level relative to the ionisation level (in eV)
 
@@ -786,7 +786,11 @@ class AlkaliAtom(object):
             return self._getSavedEnergy(n, l, j, s=s)
 
         # else, use quantum defects
-        defect = self.getQuantumDefect(n, l, j, s=s)
+        if isinstance(quantumDefect, (np.float64, int, float)): 
+            #print("Overwriting Defect")
+            defect = quantumDefect
+        else:            
+            defect = self.getQuantumDefect(n, l, j, s=s)
         return -self.scaledRydbergConstant / ((n - defect) ** 2)
 
     def _getSavedEnergy(self, n, l, j, s=0.5):

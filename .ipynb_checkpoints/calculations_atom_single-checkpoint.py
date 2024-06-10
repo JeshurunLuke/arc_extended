@@ -524,10 +524,7 @@ class RET:
                 print(indOI)
             res[state, :] = [Eref - eg[scan_param][indOI] for scan_param in range(len(self.StarkScan.y))]           
         return res
-    def find_energy_state(self, n, l, level=0, debug = False):
-        res = self.find_energy(n, l, debug = debug)
-        return res[level, :]
-            
+        
     def find_resonance(self,n,l, debug = False): 
         basisStates = self.StarkScan.basisStates
         statesOI = []
@@ -556,7 +553,7 @@ class RET:
             indOI = startPoint + state
             if debug:
                 print(indOI)
-            resonanceDiff = np.zeros((4, len(self.StarkScan.y)))
+            resonanceDiff = np.zeros((3, len(self.StarkScan.y)))
             comp = []
             for scan_param in range(len(self.StarkScan.y)):
                 
@@ -567,12 +564,11 @@ class RET:
                 resonanceDiff[0, scan_param] = eg[scan_param][indOI]
                 
                 diff = eDiff - self.TransitionFrequency
-                dipoleCoupling = np.sum([(stateInit.conj().T @ dip @ eigVecs[scan_param]) for dip in [self.StarkScan.dip_x,self.StarkScan.dip_y, self.StarkScan.dip_z]], 0)
+                dipoleCoupling = np.sum([np.abs(stateInit.conj().T @ dip @ eigVecs[scan_param]) for dip in [self.StarkScan.dip_x,self.StarkScan.dip_y, self.StarkScan.dip_z]], 0)
                 #dipoleCoupling = np.sum([(stateInit.conj().T @ dip @ eigVecs[scan_param]) for ip in [self.StarkScan.dip_x,self.StarkScan.dip_y, self.StarkScan.dip_z]], 0)
                                 
                 resonanceDiff[1, scan_param] = diff[np.argmin(np.abs(diff))]
                 resonanceDiff[2, scan_param] = np.sum(np.abs(dipoleCoupling/diff))
-                resonanceDiff[3, scan_param] = np.sum(np.abs(dipoleCoupling/diff))
                 comp.append(
                     self.StarkScan._stateComposition(self.StarkScan._stateComposition2(
                         eigVecs[scan_param][:, indOI],
@@ -825,7 +821,7 @@ class StarkMap:
         for ii in xrange(dimension):
             for jj in xrange(ii + 1, dimension):
 
-                dipz[jj][ii]  = self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],0,s=self.s)*1.e-9/C_h*C_e*physical_constants["Bohr radius"][0]
+                dipz[jj][ii]  = self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],0,s=self.s)*1.e-9/C_h*C_e*physical_constants["Bohr radius"][0]/sqrt(2)
                 dipx[jj][ii] = (self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],-1,s=self.s)-self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],1,s=self.s))*\
                 1.e-9/C_h*C_e*physical_constants["Bohr radius"][0]/sqrt(2)
                 dipy[jj][ii]   = 1j*(self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],1,s=self.s)+self.atom.getDipoleMatrixElement(states[ii][0],states[ii][1],states[ii][2],states[ii][3],states[jj][0],states[jj][1],states[jj][2],states[jj][3],-1,s=self.s))*\
@@ -847,9 +843,7 @@ class StarkMap:
         maxL,
         progressOutput=False,
         debugOutput=False,
-        s=0.5, compressedBasis = False, 
-        offset = {}, 
-        quantumDefect = {} 
+        s=0.5, compressedBasis = False
     ):
         """
         Initializes basis of states around state of interest
@@ -974,16 +968,13 @@ class StarkMap:
             # add diagonal element
             self.mat1[ii][ii] = (
                 self.atom.getEnergy(
-                    states[ii][0], states[ii][1], states[ii][2], s=self.s, quantumDefect = quantumDefect.get(tuple([states[ii][1], states[ii][2]]), None)
+                    states[ii][0], states[ii][1], states[ii][2], s=self.s
                 )
                 * C_e
                 / C_h
                 * 1e-9
 
-            ) + offset.get(tuple([states[ii][0], states[ii][1], states[ii][2]]), 0) * 1e-3
-            
-            if offset.get(tuple([states[ii][0], states[ii][1], states[ii][2]]), 0) != 0: 
-                print([states[ii][0], states[ii][1], states[ii][2]])
+            )
             self.mat3[ii][ii] = (
                 self.atom.getZeemanEnergyShift(
                     states[ii][1],
@@ -1000,7 +991,7 @@ class StarkMap:
 
 
         if progressOutput:
-            print(" n")
+            print("\n")
         if debugOutput:
             print(self.mat1 + self.mat2 + self.mat3)
             print(self.mat2[0])
@@ -1168,7 +1159,7 @@ class StarkMap:
         if progressOutput:
             print("Finding eigenvectors...")
         progress = 0.0
-        
+
         self.mat2 = [self.dip_x*np.sin(self.theta[i])*np.cos(self.phi[i]) + self.dip_y*np.sin(self.theta[i])*np.sin(self.phi[i]) +  self.dip_z*np.cos(self.theta[i]) for i in range(len(self.theta))]
         
         for  ind_c, field in enumerate([Barray, Earray][self.varOI]):
@@ -1181,7 +1172,7 @@ class StarkMap:
             if self.varOI: 
                 m = self.mat1 + self.mat2[ind_c]*field  + self.mat3 * Barray[0]
             else: 
-                m = self.mat2[ind_c]*Earray[0]  + self.mat3 * field+ self.mat1 
+                m = self.mat1 + self.mat2[ind_c]*Earray[0]  + self.mat3 * field
             ev, egvector = eigh(m)
 
             self.y.append(ev)
@@ -1362,8 +1353,7 @@ class StarkMap:
         debugOutput=False,
         highlightColour="red",
         addToExistingPlot=False, ylim = 1, 
-        displayAll=False,
-        x_vals=None, 
+        displayAll=False
     ):
         r"""
         Makes a plot of a stark map of energy levels
@@ -1431,29 +1421,17 @@ class StarkMap:
             existingPlot = True
 
         fieldList = []
-        varScale = None 
-        
+        varScale = 1/100 if self.varOI else 1e4
+        self.xScale = varScale
         y = []
         yState = []
-        self.xarray = None
-        import pandas as pd
-        if not(isinstance(x_vals,(list,pd.core.series.Series,np.ndarray))):
-            if self.varOI:
-                self.xarray = self.eFieldList
-                varScale = 1/100
-            else: 
-                self.xarray = self.bFieldList
-                varScale = 1e4
-        else:
-            self.xarray = x_vals
-            varScale = 1
-            
-        self.xScale = varScale
-            
+
         for br in xrange(len(self.y)):
             for i in xrange(len(self.y[br])):
-         
-                fieldList.append(self.xarray[br])
+                if self.varOI:
+                    fieldList.append(self.eFieldList[br])
+                else:
+                    fieldList.append(self.bFieldList[br])
                 y.append(self.y[br][i])
                 if displayAll: 
                     yState.append(1.0)
@@ -1672,7 +1650,11 @@ class StarkMap:
 
             x = event.mouseevent.xdata *1/self.xScale
             y = event.mouseevent.ydata / scaleFactor
-            fieldOI = self.xarray
+            fieldOI = []
+            if self.varOI: 
+                fieldOI = self.eFieldList
+            else: 
+                fieldOI = self.bFieldList 
             i = np.searchsorted(fieldOI, x)
             if i == len(fieldOI):
                 i -= 1
