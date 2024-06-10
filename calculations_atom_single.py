@@ -524,7 +524,10 @@ class RET:
                 print(indOI)
             res[state, :] = [Eref - eg[scan_param][indOI] for scan_param in range(len(self.StarkScan.y))]           
         return res
-        
+    def find_energy_state(self, n, l, level=0, debug = False):
+        res = self.find_energy(n, l, debug = debug)
+        return res[level, :]
+            
     def find_resonance(self,n,l, debug = False): 
         basisStates = self.StarkScan.basisStates
         statesOI = []
@@ -553,7 +556,7 @@ class RET:
             indOI = startPoint + state
             if debug:
                 print(indOI)
-            resonanceDiff = np.zeros((3, len(self.StarkScan.y)))
+            resonanceDiff = np.zeros((4, len(self.StarkScan.y)))
             comp = []
             for scan_param in range(len(self.StarkScan.y)):
                 
@@ -564,11 +567,12 @@ class RET:
                 resonanceDiff[0, scan_param] = eg[scan_param][indOI]
                 
                 diff = eDiff - self.TransitionFrequency
-                dipoleCoupling = np.sum([np.abs(stateInit.conj().T @ dip @ eigVecs[scan_param]) for dip in [self.StarkScan.dip_x,self.StarkScan.dip_y, self.StarkScan.dip_z]], 0)
+                dipoleCoupling = np.sum([(stateInit.conj().T @ dip @ eigVecs[scan_param]) for dip in [self.StarkScan.dip_x,self.StarkScan.dip_y, self.StarkScan.dip_z]], 0)
                 #dipoleCoupling = np.sum([(stateInit.conj().T @ dip @ eigVecs[scan_param]) for ip in [self.StarkScan.dip_x,self.StarkScan.dip_y, self.StarkScan.dip_z]], 0)
                                 
                 resonanceDiff[1, scan_param] = diff[np.argmin(np.abs(diff))]
                 resonanceDiff[2, scan_param] = np.sum(np.abs(dipoleCoupling/diff))
+                resonanceDiff[3, scan_param] = np.sum(np.abs(dipoleCoupling/diff))
                 comp.append(
                     self.StarkScan._stateComposition(self.StarkScan._stateComposition2(
                         eigVecs[scan_param][:, indOI],
@@ -843,7 +847,9 @@ class StarkMap:
         maxL,
         progressOutput=False,
         debugOutput=False,
-        s=0.5, compressedBasis = False
+        s=0.5, compressedBasis = False, 
+        offset = {}, 
+        quantumDefect = {} 
     ):
         """
         Initializes basis of states around state of interest
@@ -968,13 +974,16 @@ class StarkMap:
             # add diagonal element
             self.mat1[ii][ii] = (
                 self.atom.getEnergy(
-                    states[ii][0], states[ii][1], states[ii][2], s=self.s
+                    states[ii][0], states[ii][1], states[ii][2], s=self.s, quantumDefect = quantumDefect.get(tuple([states[ii][1], states[ii][2]]), None)
                 )
                 * C_e
                 / C_h
                 * 1e-9
 
-            )
+            ) + offset.get(tuple([states[ii][0], states[ii][1], states[ii][2]]), 0) * 1e-3
+            
+            if offset.get(tuple([states[ii][0], states[ii][1], states[ii][2]]), 0) != 0: 
+                print([states[ii][0], states[ii][1], states[ii][2]])
             self.mat3[ii][ii] = (
                 self.atom.getZeemanEnergyShift(
                     states[ii][1],
@@ -991,7 +1000,7 @@ class StarkMap:
 
 
         if progressOutput:
-            print("\n")
+            print(" n")
         if debugOutput:
             print(self.mat1 + self.mat2 + self.mat3)
             print(self.mat2[0])
