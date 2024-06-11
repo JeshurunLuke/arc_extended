@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, print_function, absolute_import
-from arc.alkali_atom_functions import AlkaliAtom, printStateLetter
-from arc.wigner import Wigner3j, Wigner6j
+from arc_extended.alkali_atom_functions import AlkaliAtom, printStateLetter
+from arc_extended.wigner import Wigner3j, Wigner6j
 from scipy.constants import physical_constants
 import csv
 
@@ -9,7 +9,7 @@ import os
 import numpy as np
 from math import sqrt
 
-from arc._database import sqlite3, UsedModulesARC
+from arc_extended._database import sqlite3, UsedModulesARC
 
 sqlite3.register_adapter(np.float64, float)
 sqlite3.register_adapter(np.float32, float)

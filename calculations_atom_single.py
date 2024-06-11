@@ -44,9 +44,9 @@ from scipy.special import sph_harm
 
 import sys
 
-from arc._database import UsedModulesARC
-from arc.divalent_atom_functions import DivalentAtom
-from arc.wigner import Wigner6j, CG
+from arc_extended._database import UsedModulesARC
+from arc_extended.divalent_atom_functions import DivalentAtom
+from arc_extended.wigner import Wigner6j, CG
 
 
 if sys.version_info > (2,):

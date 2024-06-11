@@ -54,7 +54,7 @@ __all__ = [
     "getCitationForARC",
 ]
 
-from arc_extended.alkali_atom_functions import (
+from arc.alkali_atom_functions import (
     AlkaliAtom,
     printState,
     printStateString,
@@ -62,7 +62,7 @@ from arc_extended.alkali_atom_functions import (
     printStateLetter,
     formatNumberSI,
 )
-from arc_extended.alkali_atom_data import (
+from arc.alkali_atom_data import (
     Hydrogen,
     Caesium,
     Cesium,
@@ -77,8 +77,8 @@ from arc_extended.alkali_atom_data import (
     Potassium40,
     Potassium41,
 )
-from arc_extended.divalent_atom_data import Strontium88, Calcium40, Ytterbium174
-from arc_extended.calculations_atom_single import (
+from arc.divalent_atom_data import Strontium88, Calcium40, Ytterbium174
+from arc.calculations_atom_single import (
     Ylm,
     Wavefunction,
     StarkMap,
@@ -91,12 +91,12 @@ from arc_extended.calculations_atom_single import (
     RWAStarkShift,
     RET,
 )
-from arc_extended.calculations_atom_pairstate import (
+from arc.calculations_atom_pairstate import (
     PairStateInteractions,
     StarkMapResonances,
 )
-from arc_extended.wigner import Wigner3j, Wigner6j, TriaCoeff, CG, WignerDmatrix
-from arc_extended._database import getCitationForARC
+from arc.wigner import Wigner3j, Wigner6j, TriaCoeff, CG, WignerDmatrix
+from arc._database import getCitationForARC
 from scipy.constants import k as C_k
 from scipy.constants import c as C_c
 from scipy.constants import h as C_h
