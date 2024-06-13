@@ -921,7 +921,7 @@ class StarkMap:
                 for tl in xrange(min(maxL + 1, tn)):
                     for tj in np.linspace(tl - s, tl + s, round(2 * s + 1)):
                         for tmj in np.arange(-tj, tj + 1, 1):
-                            if (abs(mj) - 0.1 <= tj) and (
+                            if (abs(tmj) - 0.1 <= tj) and (
                                 tn >= self.atom.groundStateN
                                 or [tn, tl, tj] in self.atom.extraLevels
                             ):
@@ -1179,6 +1179,11 @@ class StarkMap:
                 )
                 sys.stdout.flush()
             if self.varOI: 
+                print(np.shape(self.mat1))
+                print(np.shape(self.mat2))
+                print(np.shape(self.mat2[ind_c]))
+                print(field)
+                print(np.shape(self.mat3))
                 m = self.mat1 + self.mat2[ind_c]*field  + self.mat3 * Barray[0]
             else: 
                 m = self.mat2[ind_c]*Earray[0]  + self.mat3 * field+ self.mat1 
