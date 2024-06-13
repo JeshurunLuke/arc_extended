@@ -1179,11 +1179,6 @@ class StarkMap:
                 )
                 sys.stdout.flush()
             if self.varOI: 
-                print(np.shape(self.mat1))
-                print(np.shape(self.mat2))
-                print(np.shape(self.mat2[ind_c]))
-                print(field)
-                print(np.shape(self.mat3))
                 m = self.mat1 + self.mat2[ind_c]*field  + self.mat3 * Barray[0]
             else: 
                 m = self.mat2[ind_c]*Earray[0]  + self.mat3 * field+ self.mat1 
